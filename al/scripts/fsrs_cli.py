@@ -8,6 +8,7 @@ index.json 由 Agent 按 PROTOCOL.md 的 schema 编写，本脚本负责校验�
   fsrs_cli.py status  [--course DIR]                输出课程进度 JSON
   fsrs_cli.py due     [--course DIR]                输出今日到期错题 JSON
   fsrs_cli.py grade QID RATING [--note 备注]        批改记录: RATING ∈ again|hard|good|easy
+  fsrs_cli.py ungrade QID                           删除错题卡（重复题或不再跟踪），并移出模块错题清单
   fsrs_cli.py module MID STATUS                     设置模块状态: pending|studying|done
 
 --course 缺省时解析 .al/courses.json 的 active 课程。
@@ -357,6 +358,44 @@ def cmd_grade(course, qid, rating, note, allow_new):
     )
 
 
+def cmd_ungrade(course, qid):
+    """删除错题卡：从 cards.json 移除 qid，并从所属模块的 wrong 清单移除。"""
+    idx = get_index(course)
+    module = qid_module(qid)
+    if module is None:
+        sys.exit(f"题目 ID {qid!r} 格式错误，应为 <模块号>.<题号>")
+    cards_path = os.path.join(course, "cards.json")
+    cards = load_json(cards_path, {})
+    if not isinstance(cards, dict):
+        sys.exit("cards.json 格式错误，先运行 check")
+    if qid not in cards:
+        sys.exit(f"cards.json 中没有错题卡 {qid}")
+    del cards[qid]
+
+    removed_wrong = False
+    for m in idx["modules"]:
+        if isinstance(m, dict) and m.get("id") == module and qid in m.get("wrong", []):
+            m["wrong"].remove(qid)
+            removed_wrong = True
+
+    save_json(cards_path, cards)
+    save_json(os.path.join(course, "index.json"), idx)
+    with open(os.path.join(course, "reviews.jsonl"), "a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {"qid": qid, "rating": "ungrade", "note": "删除错题卡", "at": now_iso()},
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+    print(
+        json.dumps(
+            {"ok": True, "qid": qid, "removed_from_wrong": removed_wrong},
+            ensure_ascii=False,
+        )
+    )
+
+
 def cmd_module(course, mid, status):
     idx = get_index(course)
     ids = [m["id"] for m in idx["modules"]]
@@ -412,6 +451,8 @@ def main():
     m = add("module")
     m.add_argument("mid")
     m.add_argument("status", choices=list(STATUSES))
+    u = add("ungrade")
+    u.add_argument("qid")
     args = p.parse_args()
 
     course = args.course or default_course()
@@ -425,6 +466,8 @@ def main():
         cmd_grade(course, args.qid, args.rating, args.note, args.allow_new)
     elif args.cmd == "module":
         cmd_module(course, args.mid, args.status)
+    elif args.cmd == "ungrade":
+        cmd_ungrade(course, args.qid)
 
 
 if __name__ == "__main__":

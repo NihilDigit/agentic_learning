@@ -85,6 +85,7 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 | `status` | 输出课程进度 JSON（各模块状态、错题数、卡数） |
 | `due` | 输出今日到期错题 JSON |
 | `grade <qid> <rating> [--note] [--allow-new]` | 记录批改，更新 FSRS 调度与模块错题清单；首次 `good/easy` 默认拒绝，只有用户明确要求跟踪时才加 `--allow-new` |
+| `ungrade <qid>` | 删除错题卡（题目重复或不再跟踪时）：从 cards.json 移除并在模块错题清单中除名，操作记入 reviews.jsonl |
 | `module <id> <pending\|studying\|done>` | 设置模块状态 |
 
 所有子命令接受 `--course DIR`（**必须写在子命令之后**）；缺省解析 `.al/courses.json` 的 active 课程，或 `.al/` 下唯一的课程目录。
@@ -107,4 +108,4 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 3. 讲解与批改都基于模块素材（index.json 的 `file` 字段）：PDF 用 pypdfium2 渲染页面，md 直接读。试题与答案在同一模块文件内。
 4. 题目 ID = `模块号.题号`（如 `2.2.04`）。
 5. 模块状态流转：开始讲 → `module <id> studying`；该节习题全部批改完成 → `module <id> done`。
-6. 不要手改 `cards.json` / `reviews.jsonl`，FSRS 状态只经 `grade` 更新。
+6. 不要手改 `cards.json` / `reviews.jsonl`，FSRS 状态只经 `grade` / `ungrade` 更新。

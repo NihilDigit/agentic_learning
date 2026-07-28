@@ -5,6 +5,9 @@
     Q: 问题（可多行）
     A: 答案（可多行）
 
+图片: Q/A 中可写 Markdown 图片 ![alt](相对课程目录的路径.png)，
+同步时经 storeMediaFile 上传并替换为 <img>（按文件名去重，Anki 媒体库内覆盖同名文件）。
+
 同步语义: md 是事实来源。按 CardID 匹配 Anki note，存在则更新，不存在则新建。
 md 里删掉的卡不会自动从 Anki 删除（防误删），只报告孤立数量。
 
@@ -12,6 +15,7 @@ md 里删掉的卡不会自动从 Anki 删除（防误删），只报告孤立�
 """
 
 import argparse
+import base64
 import glob
 import json
 import os
@@ -27,6 +31,7 @@ CARD_BLOCK = re.compile(
     r"Q:\s*(.*?)\nA:\s*(.*)",
     re.DOTALL,
 )
+IMG_REF = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
 
 
 class CardParseError(ValueError):
@@ -94,6 +99,23 @@ def parse_cards(course):
                 }
             )
     return cards
+
+
+def resolve_media(course, text):
+    """把 Q/A 中的 ![alt](相对路径) 上传到 Anki 媒体库并替换为 <img> 标签。"""
+
+    def repl(m):
+        rel = m.group(1)
+        path = os.path.join(course, rel)
+        if not os.path.isfile(path):
+            raise CardParseError(f"图片不存在：{path}")
+        filename = os.path.basename(rel)
+        with open(path, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
+        rpc("storeMediaFile", filename=filename, data=data)
+        return f'<img src="{filename}">'
+
+    return IMG_REF.sub(repl, text)
 
 
 def ensure_model():
@@ -211,6 +233,12 @@ def main():
         if not cards:
             result = {"ok": True, "cards": 0, "msg": "anki_cards/ 下没有卡片"}
         else:
+            # 上传 Q/A 中引用的图片并替换为 <img>（Anki 媒体库按文件名去重）；
+            # 需在连通 AnkiConnect 后再做，故放在此处而非 parse_cards 里。
+            rpc("version")
+            for c in cards:
+                c["q"] = resolve_media(course, c["q"])
+                c["a"] = resolve_media(course, c["a"])
             result = sync_cards(deck, cards)
         print(json.dumps(result, ensure_ascii=False))
         return 0
