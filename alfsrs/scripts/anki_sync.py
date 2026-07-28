@@ -25,6 +25,11 @@ import urllib.request
 
 CONNECT = "http://localhost:8765"
 MODEL = "agenticLearning"
+
+# Windows GBK 控制台输出中文会乱码，强制 UTF-8
+if sys.stdout.encoding and sys.stdout.encoding.upper() != "UTF-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 CARD_START = re.compile(r"<!--\s*id:")
 CARD_BLOCK = re.compile(
     r"<!--\s*id:\s*(\S+?)\s*(?:\|\s*tags:\s*(.*?))?\s*-->\s*\n"

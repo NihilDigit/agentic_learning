@@ -45,6 +45,7 @@ class FsrsCliTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(CLI), *args, "--course", str(self.course)],
             text=True,
+            encoding="utf-8",
             capture_output=True,
             check=False,
         )

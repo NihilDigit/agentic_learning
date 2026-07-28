@@ -88,6 +88,8 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 | `ungrade <qid>` | 删除错题卡（题目重复或不再跟踪时）：从 cards.json 移除并在模块错题清单中除名，操作记入 reviews.jsonl |
 | `module <id> <pending\|studying\|done>` | 设置模块状态 |
 
+`render_pdf.py <pdf> <outdir> [--pages 1-3,5] [--scale 2]`：把模块 PDF 渲染成 PNG（pypdfium2，自动带 pillow 依赖），供讲解、呈现题目用。
+
 所有子命令接受 `--course DIR`（**必须写在子命令之后**）；缺省解析 `.al/courses.json` 的 active 课程，或 `.al/` 下唯一的课程目录。
 
 制卡同步脚本 `anki_sync.py` bundle 在 `alfsrs` skill 内。
@@ -105,7 +107,9 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 
 1. 续学（al）：先跑 `status` 读 index.json，从 `next_module` / studying 断点继续。**不自动触发复习，不主动播报到期数**。
 2. 复习只在 alreview 时进行；制卡只在 alfsrs 时进行；讲解/批改中不主动提议制卡。
-3. 讲解与批改都基于模块素材（index.json 的 `file` 字段）：PDF 用 pypdfium2 渲染页面，md 直接读。试题与答案在同一模块文件内。
-4. 题目 ID = `模块号.题号`（如 `2.2.04`）。
+3. 讲解与批改都基于模块素材（index.json 的 `file` 字段）：PDF 用 `render_pdf.py` 渲染页面，md 直接读。试题与答案在同一模块文件内。
+4. 题目 ID = `模块号.题号`（如 `2.2.04`）；题号按材料编号补零对齐（材料印的是三位就写 `1.1.001`），保证全局唯一且可排序。
 5. 模块状态流转：开始讲 → `module <id> studying`；该节习题全部批改完成 → `module <id> done`。
 6. 不要手改 `cards.json` / `reviews.jsonl`，FSRS 状态只经 `grade` / `ungrade` 更新。
+7. **更正 ≠ 复盘。** 批改后的当场更正是讲解的延伸：讲思路、用户当场重做改对，**不更新 FSRS**；复盘是 `alreview` 的到期重测（学习步长为天级，首次到期约 2 天后），做对按规则 `ungrade` 或 `grade good`，做错 `grade again`。做错题卡住时只给提示不给完整答案。
+8. Windows 环境注意：① 脚本输出中文前先 `sys.stdout.reconfigure(encoding="utf-8")`（GBK 控制台会乱码）；② 含中文的 Python 代码写脚本文件执行，不要 `python -c` 内联（命令行编码会损坏中文）；③ 图题必须连图一起呈现给用户。

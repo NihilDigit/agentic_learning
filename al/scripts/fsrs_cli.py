@@ -18,9 +18,23 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fsrs import Card, Rating, Scheduler
+
+# Windows GBK 控制台输出中文会乱码，强制 UTF-8
+if sys.stdout.encoding and sys.stdout.encoding.upper() != "UTF-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
+
+def make_scheduler():
+    """学习/重学步长取天级：本系统的错题复盘以"几天后重做"为节奏，
+    默认的分钟级步长会让新错题当天就到期，不符合使用预期。"""
+    return Scheduler(
+        learning_steps=(timedelta(days=2), timedelta(days=4)),
+        relearning_steps=(timedelta(days=2),),
+    )
 
 
 def default_course():
@@ -266,12 +280,18 @@ def cmd_due(course):
         if due_dt.tzinfo is None:
             due_dt = due_dt.replace(tzinfo=timezone.utc)
         if due_dt <= now:
+            wrong_count = sum(
+                1
+                for h in c.get("history", [])
+                if h.get("rating") in ("again", "hard")
+            )
             due.append(
                 {
                     "qid": c["qid"],
                     "module": c["module"],
                     "due": c["fsrs"]["due"],
                     "lapses": c["fsrs"].get("lapses", 0),
+                    "wrong_count": wrong_count,
                     "last_note": c.get("last_note"),
                 }
             )
@@ -305,7 +325,7 @@ def cmd_grade(course, qid, rating, note, allow_new):
     if qid in cards and cards[qid].get("module") != module:
         sys.exit(f"cards.json 中 {qid} 的模块归属不一致，先运行 check")
 
-    scheduler = Scheduler()
+    scheduler = make_scheduler()
     if qid in cards:
         card = Card.from_dict(cards[qid]["fsrs"])
     else:
