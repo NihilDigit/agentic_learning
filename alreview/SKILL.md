@@ -14,7 +14,7 @@ metadata:
 
 1. 运行 `uvx --with fsrs python <AL>/scripts/fsrs_cli.py due`，得到到期错题列表（含 qid、模块、上次错误备注、`wrong_count` 历史错误次数）。没有到期题就直说，结束。
 2. 逐题处理（一次一题，不要整页甩给用户）：
-   - 按 qid 的模块号从 `.al/<course>/index.json` 找到模块素材文件，呈现题目（PDF 用 `<AL>/scripts/render_pdf.py` 渲染对应页，md 直接引用；图题必须连图一起给）
+   - 按 qid 的模块号从 `.al/<course>/index.json` 找到模块素材文件，呈现题目（PDF 用 `<AL>/scripts/render_pdf.py` 渲染对应页，md 直接读）。**渲染出来的页面是给 Agent 自己读的**，给用户报题号让其在做题本上找即可，见 PROTOCOL「图片：两种用途，别混」
    - 可以提示"上次错因类型"，但不要直接给答案
    - 用户作答后，对照该模块素材的答案部分批改
 3. 每题批改后立即记录（命令前缀同上）：

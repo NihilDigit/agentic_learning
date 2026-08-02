@@ -88,7 +88,11 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 | `ungrade <qid>` | 删除错题卡（题目重复或不再跟踪时）：从 cards.json 移除并在模块错题清单中除名，操作记入 reviews.jsonl |
 | `module <id> <pending\|studying\|done>` | 设置模块状态 |
 
-`render_pdf.py <pdf> <outdir> [--pages 1-3,5] [--scale 2]`：把模块 PDF 渲染成 PNG（pypdfium2，自动带 pillow 依赖），供讲解、呈现题目用。
+`render_pdf.py <pdf> <outdir> [--pages 1-3,5] [--scale 2]`：把模块 PDF 渲染成 PNG，供讲解、呈现题目用。依赖必须显式声明，脚本没有 PEP 723 头，`uvx python render_pdf.py` 会 `ModuleNotFoundError`：
+
+```
+uvx --with pypdfium2 --with pillow python <AL>/scripts/render_pdf.py <pdf> <outdir> --scale 2
+```
 
 所有子命令接受 `--course DIR`（**必须写在子命令之后**）；缺省解析 `.al/courses.json` 的 active 课程，或 `.al/` 下唯一的课程目录。
 
@@ -103,6 +107,22 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 
 只对错题（again/hard）建卡进入 FSRS；做对的题不建卡。若用户明确要求跟踪一开始就做对的题，使用 `--allow-new`。
 
+## 图片：两种用途，别混
+
+**`render_pdf.py` 的产物是给 Agent 看的**，不是给用户的。用户手上有原书和做题本（纸质或电子笔记），题目自己翻、答案自己写。Agent 渲染 PDF 页是为了自己读题干、对答案、核对题号，**默认不要推给用户**——除非用户说找不到某题，或题干带图而用户明确要图。呈现题目时给题号（如 `1.2.2-005`）让用户在做题本上定位即可。
+
+**需要送到用户眼前的是 Agent 自己生成的讲解配图**（函数图象等）。这类图宿主之间差异很大，**默认按「用户看不见」处理**：
+
+1. 先用读图工具（Read / ReadMediaFile）读一遍 —— 这一步是给 Agent 自查的：渲染对不对、字糊不糊、公式有没有截断。
+2. 再用宿主的文件推送工具显式发给用户（Claude Code / Claude Desktop 是 `SendUserFile`，`display: "render"`）。**只有这一步用户才看得到。**
+3. 确认过宿主的读图工具会自动向用户展示，才可以省掉第 2 步。不确定就推送 —— 重复展示的代价远小于用户对着「看下图」却没有图。
+4. 正文里**不写** `![...](...)`，本地路径在 Web 端加载不了。
+5. 传路径用正斜杠相对路径（`.al/_render/x.png`），Windows 反斜杠会破坏工具入参的 JSON 解析。
+
+## 项目侧约定
+
+课程目录或其上级可能有 `AGENTS.md` / `CLAUDE.md` 等项目约定文件，写的是这门课怎么教（讲解深度与顺序、画图规范、知识点素材来源等）。**开工前先读**，宿主不保证把它自动加载进上下文。与本协议冲突时以项目约定为准：本协议管状态机与脚本接口，项目约定管教学风格。
+
 ## 行为纪律
 
 1. 续学（al）：先跑 `status` 读 index.json，从 `next_module` / studying 断点继续。**不自动触发复习，不主动播报到期数**。
@@ -112,4 +132,4 @@ index.json 由 Agent 编写，写完用 `check` 校验。模块怎么切分、�
 5. 模块状态流转：开始讲 → `module <id> studying`；该节习题全部批改完成 → `module <id> done`。
 6. 不要手改 `cards.json` / `reviews.jsonl`，FSRS 状态只经 `grade` / `ungrade` 更新。
 7. **更正 ≠ 复盘。** 批改后的当场更正是讲解的延伸：讲思路、用户当场重做改对，**不更新 FSRS**；复盘是 `alreview` 的到期重测（学习步长为天级，首次到期约 2 天后），做对按规则 `ungrade` 或 `grade good`，做错 `grade again`。做错题卡住时只给提示不给完整答案。
-8. Windows 环境注意：① 脚本输出中文前先 `sys.stdout.reconfigure(encoding="utf-8")`（GBK 控制台会乱码）；② 含中文的 Python 代码写脚本文件执行，不要 `python -c` 内联（命令行编码会损坏中文）；③ 图题必须连图一起呈现给用户。
+8. Windows 环境注意：① 脚本输出中文前先 `sys.stdout.reconfigure(encoding="utf-8")`（GBK 控制台会乱码）；② 含中文的 Python 代码写脚本文件执行，不要 `python -c` 内联（命令行编码会损坏中文）；③ 图的两种用途别混，见「图片：两种用途，别混」。
